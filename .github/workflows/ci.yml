@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # Run against the same Debian packages Raspberry Pi OS installs (apt, not pip),
+    # so version differences (pygame 2.1 / Pillow 9.4 / paho 1.6 on Bookworm) are caught.
+    name: Tests (Debian ${{ matrix.debian }})
+    runs-on: ubuntu-latest
+    container: debian:${{ matrix.debian }}
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: [bookworm, trixie]
+    steps:
+      - name: Install Raspberry Pi OS packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3-pygame python3-pil python3-paho-mqtt python3-pytest fonts-dejavu-core
+      - uses: actions/checkout@v4
+      - name: Package versions
+        run: python3 -c "import sys, pygame, PIL; print(sys.version); print('Pillow', PIL.__version__)"
+      - name: Run tests
+        run: python3 -m pytest -v
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ruff (Python)
+        run: pipx run ruff check .
+      - name: ShellCheck (install.sh)
+        run: shellcheck install.sh

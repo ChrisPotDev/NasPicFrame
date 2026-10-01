@@ -1,0 +1,5 @@
+# Everything runs on the Pi: always check out with LF, even on Windows,
+# or install.sh and the systemd unit break with "\r" errors.
+* text=auto eol=lf
+*.jpg binary
+*.png binary

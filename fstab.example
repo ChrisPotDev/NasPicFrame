@@ -1,0 +1,4 @@
+# Append this ONE line to /etc/fstab (edit the server, share and uid/gid first).
+# Use the NAS's IP address rather than its name: name resolution (mDNS) may not be
+# working yet that early in boot. A space in the share name must be written as \040.
+//192.168.1.10/Photos  /mnt/photos  cifs  credentials=/etc/samba/nas-credentials,uid=1000,gid=1000,ro,vers=3.0,iocharset=utf8,file_mode=0444,dir_mode=0555,soft,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30,x-systemd.after=network-online.target  0  0

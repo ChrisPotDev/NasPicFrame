@@ -1,0 +1,25 @@
+name: Release
+
+# Push a tag like v2.0.0 to publish a release with a ready-to-install archive.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build archive
+        run: |
+          mkdir -p dist/naspicframe
+          cp picframe.py config.ini picframe.service install.sh fstab.example \
+             nas-credentials.example README.md dist/naspicframe/
+          tar -C dist -czf dist/naspicframe.tar.gz naspicframe
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/naspicframe.tar.gz --generate-notes

@@ -1,0 +1,36 @@
+# NasPicFrame slideshow. install.sh fills in @USER@ and @UID@ and copies this to
+# /etc/systemd/system/picframe.service.
+[Unit]
+Description=NasPicFrame photo slideshow
+Documentation=file:///opt/picframe/README.md
+# Start only once the network is really up and network/automount filesystems are set up.
+Wants=network-online.target
+After=network-online.target remote-fs.target systemd-user-sessions.service
+# Never stop retrying, however many times it crashes.
+StartLimitIntervalSec=0
+
+# Deliberately NOT RequiresMountsFor=/mnt/photos: if the NAS is down at boot, that
+# would fail the unit as a dependency failure, which Restart= does not retry. Instead
+# ExecStartPre waits for the share, and the app keeps retrying while it is away.
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+# The desktop session (autologin) owns the screen; talk to its compositor.
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=DISPLAY=:0
+Environment=PYTHONUNBUFFERED=1
+# Waits (max 120 s) for the Wayland/X11 session and the photo share. Fails - and
+# so gets restarted - only if no display session appears.
+ExecStartPre=/usr/bin/python3 /opt/picframe/picframe.py --config /etc/picframe/config.ini --wait --wait-timeout 120
+ExecStart=/usr/bin/python3 /opt/picframe/picframe.py --config /etc/picframe/config.ini
+Restart=always
+RestartSec=10
+TimeoutStartSec=180
+TimeoutStopSec=15
+Nice=5
+
+[Install]
+WantedBy=graphical.target
