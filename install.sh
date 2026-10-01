@@ -73,7 +73,8 @@ fi
 cat <<EOF
 
 Done. Next steps:
-  1. sudo nano /etc/samba/nas-credentials      (NAS username / password)
+  1. sudo nano /etc/samba/nas-credentials      (NAS username / password;
+                                                 skip for a public/guest share)
   2. sudo nano /etc/fstab                      (add the line from fstab.example,
                                                  uid=$FRAME_UID,gid=$FRAME_GID)
   3. sudo systemctl daemon-reload && ls /mnt/photos   (test the mount)

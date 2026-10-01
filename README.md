@@ -92,6 +92,8 @@ The installer:
 
 ### 2a. Credentials
 
+*If the share is public (no username or password), skip this step and use the guest fstab line in [Public shares](#public-shares-no-username-or-password) below.*
+
 ```bash
 sudo nano /etc/samba/nas-credentials
 ```
@@ -128,6 +130,35 @@ Get your UID and GID with `id`. They are usually `1000`. Then add this **single 
 | `x-systemd.automount` | Boot never waits on the NAS. The share mounts the first time something reads `/mnt/photos`, and mounts again on the next access after an outage. This is what makes it reliable. |
 | `x-systemd.mount-timeout=30` | A dead NAS blocks a mount attempt for at most 30 s. |
 | `x-systemd.after=network-online.target` | Mount attempts wait until the network is really up. |
+
+### Public shares (no username or password)
+
+Some shares are open to anyone on the network (guest access). This is common on routers with a USB-disk share and on NAS folders marked *public*. For those, replace `credentials=…` with `guest`:
+
+```
+//192.168.1.10/Public  /mnt/photos  cifs  guest,uid=1000,gid=1000,ro,vers=3.0,iocharset=utf8,file_mode=0444,dir_mode=0555,soft,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30,x-systemd.after=network-online.target  0  0
+```
+
+The `/etc/samba/nas-credentials` file the installer created isn't used then; you can leave it or delete it. Everything else (automount, read-only, `nofail`) works the same way.
+
+Guest access is where SMB is fussiest. If the test in 2c fails, work down this list, changing one thing at a time:
+
+| Symptom (`sudo dmesg \| tail`) | Try |
+|---|---|
+| `error -13` (permission denied) | Some servers expect the guest *user name* rather than an anonymous login. Replace `guest` with `username=guest,password=`. |
+| Still `-13` on a Windows PC share | Windows maps guests to the *Guest* account, which is disabled by default. Either share the folder to **Everyone**, or (better) create a local user for the frame and use the credentials file from 2a. |
+| `error -95` or `-22` (not supported / invalid) | The server may refuse guest logins over newer SMB versions, because guest sessions can't sign traffic. Try `vers=2.1`, then `vers=2.0`. |
+| Mounts, but folders appear empty | The share allows guest connections but guests can't *read* the photos folder. Fix the folder permissions on the NAS: give *guest* or *everyone* read access. |
+| Old router or NAS that only offers SMB1 | `vers=1.0` works with `guest`, but SMB1 is insecure and deprecated. Use it only on a trusted home network, and prefer updating the device's firmware or enabling SMB2 on it. |
+
+To check what the server offers before touching fstab:
+```bash
+sudo apt install -y smbclient
+smbclient -L //192.168.1.10 -N         # -N = no password: lists shares if guest access works
+smbclient //192.168.1.10/Public -N -c 'ls'   # can a guest actually read the share?
+```
+
+**Security:** a guest share is readable by every device on your network. That's fine for holiday photos on a home LAN. For private photos, a password-protected share with a read-only account (2a) is better. Either way, the frame mounts the share read-only, so it can never change or delete anything.
 
 ### 2c. Test it
 
