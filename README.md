@@ -1,5 +1,7 @@
 # NasPicFrame
 
+[![CI](https://github.com/ChrisPotDev/NasPicFrame/actions/workflows/ci.yml/badge.svg)](https://github.com/ChrisPotDev/NasPicFrame/actions/workflows/ci.yml)
+
 A Raspberry Pi picture frame that runs on its own. It boots straight into a fullscreen, shuffled slideshow of photos from an SMB/CIFS share on a NAS, and switches the display off at night.
 
 - **Portrait pairing:** two portrait photos are shown side by side, instead of one with wide empty borders.
@@ -54,7 +56,18 @@ The slideshow only reads from the NAS on background threads. If the NAS drops of
 
 ## Step 1: Copy the files and run the installer
 
-From your PC (or with `git clone` on the Pi):
+On the Pi, over SSH:
+
+```bash
+sudo apt install -y git
+git clone https://github.com/ChrisPotDev/NasPicFrame.git
+cd NasPicFrame
+sudo ./install.sh
+```
+
+To upgrade later: `cd ~/NasPicFrame && git pull && sudo ./install.sh`. Your config is migrated, not replaced; see *Upgrading* below.
+
+<details><summary>Without git: copy the files from your PC</summary>
 
 ```bash
 scp -r NasPicFrame <user>@<pi-address>:~/
@@ -64,6 +77,7 @@ sed -i 's/\r$//' install.sh      # only needed if the files went through Windows
 chmod +x install.sh
 sudo ./install.sh
 ```
+</details>
 
 The installer:
 - installs `python3-pygame python3-pil cifs-utils wlr-randr wlopm`
