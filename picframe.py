@@ -718,7 +718,7 @@ def render_slide(paths, size, settings, geocoder):
 
     canvas = Image.new("RGB", size, settings.background)
     panels = []
-    for photo, rect in zip(photos, panel_rects(size, len(photos), settings.pair_gap)):
+    for photo, rect in zip(photos, panel_rects(size, len(photos), settings.pair_gap), strict=True):
         panels.append(Panel(place_photo(canvas, photo.image, rect, settings),
                             caption_for(photo, settings, geocoder)))
     return Slide(tuple(p.path for p in photos), canvas, panels)
@@ -789,7 +789,7 @@ def builtin_placeholder(size):
     # Vertical gradient: a 1-pixel strip, stretched.
     top, bottom = (40, 54, 78), (12, 14, 20)
     strip = Image.new("RGB", (1, 256))
-    strip.putdata([tuple(int(t + (b - t) * i / 255) for t, b in zip(top, bottom))
+    strip.putdata([tuple(int(t + (b - t) * i / 255) for t, b in zip(top, bottom, strict=True))
                    for i in range(256)])
     canvas = strip.resize(size, SMOOTH)
 

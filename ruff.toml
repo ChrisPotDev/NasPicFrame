@@ -1,0 +1,8 @@
+# Explicit rule set, so a new Ruff release can't change what CI enforces.
+target-version = "py311"  # Debian Bookworm / Raspberry Pi OS
+
+[lint]
+# pycodestyle errors, pyflakes, bugbear. Deliberately not DTZ (the frame runs on
+# local wall-clock time) or BLE (broad excepts guard against corrupt photos and NAS
+# drops, and always log).
+select = ["E4", "E7", "E9", "F", "B"]
