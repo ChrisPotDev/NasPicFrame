@@ -18,6 +18,10 @@ jobs:
           mkdir -p dist/naspicframe
           cp picframe.py config.ini picframe.service install.sh fstab.example \
              nas-credentials.example README.md dist/naspicframe/
+          mkdir -p dist/naspicframe/addons dist/naspicframe/docs
+          cp -r addons/music dist/naspicframe/addons/
+          rm -rf dist/naspicframe/addons/music/tests dist/naspicframe/addons/music/youtube-receiver/test
+          cp docs/*.md dist/naspicframe/docs/
           tar -C dist -czf dist/naspicframe.tar.gz naspicframe
       - name: Publish release
         env:

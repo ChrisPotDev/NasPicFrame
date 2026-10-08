@@ -8,6 +8,7 @@ jobs:
   test:
     # Run against the same Debian packages Raspberry Pi OS installs (apt, not pip),
     # so version differences (pygame 2.1 / Pillow 9.4 / paho 1.6 on Bookworm) are caught.
+    # Covers the frame (tests/) and the music add-on's Python (addons/music/tests/).
     name: Tests (Debian ${{ matrix.debian }})
     runs-on: ubuntu-latest
     container: debian:${{ matrix.debian }}
@@ -27,6 +28,25 @@ jobs:
       - name: Run tests
         run: python3 -m pytest -v
 
+  youtube-receiver:
+    # Node 20 = the version Raspberry Pi OS Trixie ships.
+    name: YouTube receiver (Node 20)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: addons/music/youtube-receiver
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: addons/music/youtube-receiver/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Syntax check
+        run: for f in *.js; do node --check "$f"; done
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -34,5 +54,5 @@ jobs:
       - uses: actions/checkout@v5
       - name: Ruff (Python)
         run: pipx run ruff==0.16.9 check --output-format=github .
-      - name: ShellCheck (install.sh)
-        run: shellcheck install.sh
+      - name: ShellCheck
+        run: shellcheck install.sh addons/music/*.sh

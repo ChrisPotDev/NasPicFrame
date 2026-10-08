@@ -1,0 +1,14 @@
+[Unit]
+Description=NasPicFrame music add-on: YouTube / YouTube Music cast receiver
+# Started and stopped by the coordinator according to music.ini.
+PartOf=music-coordinator.service
+After=pipewire-pulse.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/picframe-music/launch.py youtube --config /etc/picframe/music.ini
+# The receiver remembers paired phones here (~/.local/state/picframe-music).
+StateDirectory=picframe-music
+WorkingDirectory=%S/picframe-music
+Restart=always
+RestartSec=5

@@ -371,6 +371,16 @@ picframe/<node>/photo/state, …/photo/attributes, …/availability (online | of
 ```
 For example: `mosquitto_pub -h 192.168.1.20 -u picframe -P … -t picframe/livingroom/next/set -m PRESS`
 
+## Optional: music add-on
+
+The [music add-on](addons/music/README.md) turns the frame's Pi into a speaker for your amplifier. Guests can cast from **YouTube Music**, **Spotify** (Premium) or **AirPlay** on their phones, with nothing to install. It's a separate install, and the frame works the same without it:
+
+```bash
+sudo ./addons/music/install-music.sh
+```
+
+With the add-on installed, the frame shows a small "now playing" card (artwork, title, artist) while music plays, and otherwise a one-line hint with the speaker name and YouTube TV code. The `[overlay]` options `show_now_playing`, `show_music_hint` and `now_playing_position` control this.
+
 ## Daily use and troubleshooting
 
 ```bash

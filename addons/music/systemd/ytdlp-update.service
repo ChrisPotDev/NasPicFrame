@@ -1,0 +1,6 @@
+[Unit]
+Description=NasPicFrame music add-on: update yt-dlp
+
+[Service]
+Type=oneshot
+ExecStart=/opt/picframe-music/update-ytdlp.sh --timer

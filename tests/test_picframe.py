@@ -1,11 +1,13 @@
 """Tests for the parts of picframe.py that don't need a display, a NAS or a broker."""
 
 import datetime as dt
+import json
 import os
 import sys
 import textwrap
 import time
 
+import pygame
 import pytest
 from PIL import Image
 
@@ -215,3 +217,35 @@ def test_library_scans_folders_and_detects_orientation(tmp_path):
     assert {library.next(), library.next()} == {landscape, rotated}
     assert library.is_portrait(rotated) is True
     assert library.is_portrait(landscape) is False
+
+
+# --------------------------------------------------------------------------- music add-on status
+
+def test_music_status_reads_fresh_files_and_ignores_stale(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    (tmp_path / "picframe").mkdir()
+    status = picframe.MusicStatus()
+    assert status.refresh(now=1000) is False and status.now_playing is None  # no add-on
+
+    np = {"state": "playing", "source": "spotify", "title": "T", "artist": "A", "updated": 990}
+    (tmp_path / "picframe" / "nowplaying.json").write_text(json.dumps(np))
+    (tmp_path / "picframe" / "music-hint.json").write_text(
+        json.dumps({"name": "Living Room", "tv_code": "123 456", "updated": 990}))
+    assert status.refresh(now=1000) is True
+    assert status.now_playing["title"] == "T"
+    assert status.hint_text() == "Cast music to \u201cLiving Room\u201d  \u00b7  YouTube TV code 123 456"
+
+    np["updated"] = 1000  # only the timestamp changed: no redraw needed
+    (tmp_path / "picframe" / "nowplaying.json").write_text(json.dumps(np))
+    assert status.refresh(now=1005) is False
+
+    assert status.refresh(now=1000 + picframe.NOW_PLAYING_MAX_AGE + 1) is True  # stale
+    assert status.now_playing is None
+
+
+def test_ellipsize():
+    pygame.font.init()
+    font = pygame.font.Font(None, 20)
+    assert picframe.ellipsize(font, "short", 500) == "short"
+    long = picframe.ellipsize(font, "a very long track title that will not fit", 80)
+    assert long.endswith("\u2026") and font.size(long)[0] <= 80

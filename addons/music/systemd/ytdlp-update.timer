@@ -1,0 +1,11 @@
+[Unit]
+Description=NasPicFrame music add-on: nightly yt-dlp update
+
+[Timer]
+OnCalendar=*-*-* 04:30
+RandomizedDelaySec=30min
+# Catch up after the Pi was off at 04:30.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,19 @@
+{
+  "name": "picframe-youtube-receiver",
+  "version": "1.0.0",
+  "private": true,
+  "description": "YouTube / YouTube Music cast receiver for the NasPicFrame music add-on (DIAL + Lounge API, plays through mpv + yt-dlp).",
+  "type": "module",
+  "main": "receiver.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node receiver.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "yt-cast-receiver": "2.1.0"
+  },
+  "license": "MIT"
+}

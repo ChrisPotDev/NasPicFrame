@@ -78,6 +78,9 @@ DEFAULTS = {
         "font": "",
         "geocode": "no",
         "geocode_language": "en",
+        "show_now_playing": "yes",
+        "show_music_hint": "yes",
+        "now_playing_position": "top-right",
     },
     "schedule": {
         "wake_time": "07:00",
@@ -188,6 +191,9 @@ class Settings:
         self.font = o.get("font").strip()
         self.geocode = _choice(o, "geocode", ("no", "nominatim"))
         self.geocode_language = o.get("geocode_language").strip()
+        self.show_now_playing = o.getboolean("show_now_playing")
+        self.show_music_hint = o.getboolean("show_music_hint")
+        self.now_playing_position = _choice(o, "now_playing_position", ("top-right", "top-left"))
 
         self.wake_time = parse_hhmm(sch.get("wake_time"))
         self.sleep_time = parse_hhmm(sch.get("sleep_time"))
@@ -776,6 +782,66 @@ class SlideLoader:
 
 # --------------------------------------------------------------------------- screen
 
+# --------------------------------------------------------------------------- music add-on
+
+NOW_PLAYING_MAX_AGE = 60   # the add-on rewrites its file every 10 s while playing
+MUSIC_HINT_MAX_AGE = 180
+MUSIC_SOURCES = {"youtube": "YouTube", "spotify": "Spotify", "airplay": "AirPlay"}
+
+
+def _fresh_json(path, now, max_age):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or now - float(data.get("updated", 0)) > max_age:
+        return None  # stale: the add-on stopped without cleaning up
+    return data
+
+
+def _without_timestamp(data):
+    return None if data is None else {k: v for k, v in data.items() if k != "updated"}
+
+
+class MusicStatus:
+    """What the optional music add-on reports: the track playing, and how to cast.
+    Without the add-on its files never exist and nothing is shown."""
+
+    def __init__(self):
+        runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+        self.now_playing_path = os.path.join(runtime, "picframe", "nowplaying.json")
+        self.hint_path = os.path.join(runtime, "picframe", "music-hint.json")
+        self.now_playing = None
+        self.hint = None
+
+    def refresh(self, now=None):
+        """Re-read the add-on's files. Returns True if what should be shown changed."""
+        now = now or time.time()
+        now_playing = _fresh_json(self.now_playing_path, now, NOW_PLAYING_MAX_AGE)
+        hint = _fresh_json(self.hint_path, now, MUSIC_HINT_MAX_AGE)
+        changed = (_without_timestamp(now_playing) != _without_timestamp(self.now_playing)
+                   or _without_timestamp(hint) != _without_timestamp(self.hint))
+        self.now_playing, self.hint = now_playing, hint
+        return changed
+
+    def hint_text(self):
+        if not self.hint or not self.hint.get("name"):
+            return ""
+        text = f"Cast music to “{self.hint['name']}”"
+        if self.hint.get("tv_code"):
+            text += f"  ·  YouTube TV code {self.hint['tv_code']}"
+        return text
+
+
+def ellipsize(font, text, max_width):
+    if font.size(text)[0] <= max_width:
+        return text
+    while text and font.size(text + "…")[0] > max_width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
 def load_font(name, size):
     if name and os.path.isfile(name):
         return pygame.font.Font(name, size)
@@ -822,6 +888,8 @@ class Screen:
         self.show_clock = settings.show_clock
         self.show_info = settings.show_info
         self.clock_text = None
+        self.music = MusicStatus()
+        self._artwork = (None, None, None)  # (path, mtime, surface)
         self.open()
 
     def open(self):
@@ -837,7 +905,9 @@ class Screen:
         h = self.size[1]
         self.caption_font = load_font(self.settings.font, max(14, h // 40))
         self.clock_font = load_font(self.settings.font, max(24, h // 14))
+        self.small_font = load_font(self.settings.font, max(12, h // 54))
         self.margin = max(8, h // 50)
+        self._artwork = (None, None, None)
         log.info("Screen %dx%d (%s)", *self.size, pygame.display.get_driver())
         self.placeholder, self.placeholder_anchor = self._build_placeholder()
         self.blank()
@@ -913,7 +983,73 @@ class Screen:
             self.surface.fill(self.background)
         if self.show_clock:
             self._draw_clock()
+        self._draw_music()
         pygame.display.flip()
+
+    # ---- music add-on
+
+    def _draw_music(self):
+        if self.music.now_playing and self.settings.show_now_playing:
+            self._draw_now_playing(self.music.now_playing)
+        elif self.settings.show_music_hint and (hint := self.music.hint_text()):
+            anchor = "topright" if self.settings.now_playing_position == "top-right" else "topleft"
+            x = self.size[0] - self.margin if anchor == "topright" else self.margin
+            self._draw_text(self.small_font, hint, **{anchor: (x, self.margin)})
+
+    def _draw_now_playing(self, info):
+        """A small card in a top corner: artwork, title, artist and app."""
+        pad = max(6, self.margin // 2)
+        art_size = max(32, self.size[1] // 11)
+        max_text = self.size[0] // 3
+        title = ellipsize(self.caption_font, info.get("title") or "Unknown track", max_text)
+        details = [info.get("artist", ""), MUSIC_SOURCES.get(info.get("source"), "")]
+        if info.get("state") == "paused":
+            details.append("paused")
+        subtitle = ellipsize(self.small_font, "  ·  ".join(d for d in details if d), max_text)
+
+        art = self._load_artwork(info.get("artwork"), art_size)
+        text_w = max(self.caption_font.size(title)[0], self.small_font.size(subtitle)[0])
+        width = pad * 2 + text_w + (art_size + pad if art else 0)
+        height = art_size + pad * 2
+        x = (self.size[0] - self.margin - width if self.settings.now_playing_position == "top-right"
+             else self.margin)
+        y = self.margin
+
+        card = pygame.Surface((width, height), pygame.SRCALPHA)
+        pygame.draw.rect(card, (0, 0, 0, 150), card.get_rect(), border_radius=pad)
+        self.surface.blit(card, (x, y))
+        text_x = x + pad
+        if art:
+            self.surface.blit(art, (x + pad, y + pad))
+            text_x += art_size + pad
+        line_gap = pad // 2
+        block_h = self.caption_font.get_height() + line_gap + self.small_font.get_height()
+        text_y = y + (height - block_h) // 2
+        self.surface.blit(self.caption_font.render(title, True, (240, 240, 240)), (text_x, text_y))
+        self.surface.blit(self.small_font.render(subtitle, True, (190, 190, 190)),
+                          (text_x, text_y + self.caption_font.get_height() + line_gap))
+
+    def _load_artwork(self, path, size):
+        """Square, centre-cropped artwork surface (cached), or None."""
+        if not path:
+            return None
+        try:
+            mtime = os.stat(path).st_mtime
+        except OSError:
+            return None
+        cached_path, cached_mtime, surface = self._artwork
+        if (cached_path, cached_mtime) == (path, mtime) and surface and surface.get_width() == size:
+            return surface
+        try:
+            img = pygame.image.load(path)
+        except (pygame.error, OSError):
+            return None
+        side = min(img.get_size())
+        crop = img.subsurface(pygame.Rect((img.get_width() - side) // 2,
+                                          (img.get_height() - side) // 2, side, side))
+        surface = pygame.transform.smoothscale(crop, (size, size)).convert()
+        self._artwork = (path, mtime, surface)
+        return surface
 
     def _draw_clock(self):
         self.clock_text = time.strftime(self.settings.clock_format)
@@ -1084,6 +1220,7 @@ class PictureFrame:
         self.failures = 0
         self.config_mtime = file_mtime(settings.path)
         self.last_config_check = 0.0
+        self.last_music_check = 0.0
 
     def _start_mqtt(self):
         if not self.s.mqtt_enabled:
@@ -1123,7 +1260,12 @@ class PictureFrame:
 
                 if self.display_on:
                     self._advance(mono)
-                    if self.screen.show_clock and time.strftime(self.s.clock_format) != self.screen.clock_text:
+                    redraw = (self.screen.show_clock
+                              and time.strftime(self.s.clock_format) != self.screen.clock_text)
+                    if mono - self.last_music_check >= 1:  # music add-on, if installed
+                        self.last_music_check = mono
+                        redraw = self.screen.music.refresh() or redraw
+                    if redraw:
                         self.screen.redraw()
                 self.clock.tick(10 if self.display_on else 2)
         finally:

@@ -1,0 +1,13 @@
+[Unit]
+Description=NasPicFrame music add-on: coordinator (routing, volume, takeover, now playing)
+After=pipewire.service pipewire-pulse.service wireplumber.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/picframe-music/coordinator.py --config /etc/picframe/music.ini
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
