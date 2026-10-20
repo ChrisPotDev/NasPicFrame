@@ -74,6 +74,10 @@ DEFAULTS = {
         "show_clock": "yes",
         "show_info": "yes",
         "clock_format": "%H:%M",
+        "clock_size": "medium",
+        "clock_position": "bottom-left",
+        "show_date": "no",
+        "clock_date_format": "%A %-d %B",
         "date_format": "%-d %B %Y",
         "font": "",
         "geocode": "no",
@@ -144,6 +148,22 @@ def parse_hhmm(value):
     return dt.datetime.strptime(value, "%H:%M").time()
 
 
+CLOCK_SIZES = {"small": 1 / 20, "medium": 1 / 14, "large": 1 / 9, "huge": 1 / 6}
+CLOCK_POSITIONS = ("top-left", "top-center", "top-right",
+                   "bottom-left", "bottom-center", "bottom-right")
+
+
+def parse_clock_size(value):
+    """'large' or '12%' -> fraction of the screen height."""
+    value = value.strip().lower()
+    if value in CLOCK_SIZES:
+        return CLOCK_SIZES[value]
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%", value)
+    if m and 2 <= float(m.group(1)) <= 40:
+        return float(m.group(1)) / 100
+    raise SystemExit(f"clock_size must be small, medium, large, huge or 2%-40%, not {value!r}")
+
+
 def _choice(section, key, allowed):
     value = section.get(key).strip().lower()
     if value not in allowed:
@@ -188,6 +208,10 @@ class Settings:
         self.show_info = o.getboolean("show_info")
         self.clock_format = o.get("clock_format")
         self.date_format = o.get("date_format")
+        self.clock_size = parse_clock_size(o.get("clock_size"))
+        self.clock_position = _choice(o, "clock_position", CLOCK_POSITIONS)
+        self.show_date = o.getboolean("show_date")
+        self.clock_date_format = o.get("clock_date_format")
         self.font = o.get("font").strip()
         self.geocode = _choice(o, "geocode", ("no", "nominatim"))
         self.geocode_language = o.get("geocode_language").strip()
@@ -842,6 +866,33 @@ def ellipsize(font, text, max_width):
     return text.rstrip() + "…"
 
 
+def place_block(sizes, position, screen_size, margin):
+    """Rects for lines of text stacked as one block (sizes = [(w, h), ...]) at a
+    screen position such as 'bottom-left'. Returns (block rect, [line rects])."""
+    vertical, horizontal = position.split("-")
+    width = max(w for w, _ in sizes)
+    height = sum(h for _, h in sizes)
+    sw, sh = screen_size
+    x = {"left": margin, "center": (sw - width) // 2, "right": sw - margin - width}[horizontal]
+    y = margin if vertical == "top" else sh - margin - height
+    lines = []
+    for w, h in sizes:
+        lx = {"left": x, "center": x + (width - w) // 2, "right": x + width - w}[horizontal]
+        lines.append(pygame.Rect(lx, y, w, h))
+        y += h
+    return lines[0].unionall(lines[1:]), lines
+
+
+def clear_of(rect, obstacle, screen_height, gap):
+    """Move `rect` up or down, away from the screen edge `obstacle` sits on,
+    so the two don't overlap."""
+    if obstacle is None or not rect.colliderect(obstacle):
+        return rect
+    if obstacle.centery > screen_height // 2:  # obstacle at the bottom: move up
+        return rect.move(0, obstacle.top - gap - rect.bottom)
+    return rect.move(0, obstacle.bottom + gap - rect.top)
+
+
 def load_font(name, size):
     if name and os.path.isfile(name):
         return pygame.font.Font(name, size)
@@ -904,7 +955,10 @@ class Screen:
             pass
         h = self.size[1]
         self.caption_font = load_font(self.settings.font, max(14, h // 40))
-        self.clock_font = load_font(self.settings.font, max(24, h // 14))
+        clock_px = max(24, int(h * self.settings.clock_size))
+        self.clock_font = load_font(self.settings.font, clock_px)
+        self.date_font = load_font(self.settings.font, max(14, int(clock_px * 0.38)))
+        self.clock_rect = None
         self.small_font = load_font(self.settings.font, max(12, h // 54))
         self.margin = max(8, h // 50)
         self._artwork = (None, None, None)
@@ -968,16 +1022,19 @@ class Screen:
         self.redraw()
 
     def redraw(self):
+        # Where the clock goes, so captions and messages can keep out of its way.
+        self.clock_rect = self._clock_layout()[0] if self.show_clock else None
         if self.message_text is not None:
             self.surface.blit(self.placeholder, (0, 0))
-            self._draw_text(self.caption_font, self.message_text, **self.placeholder_anchor)
+            self._draw_text(self.caption_font, self.message_text, avoid_clock=True,
+                            **self.placeholder_anchor)
         elif self.frame is not None:
             self.surface.blit(self.frame, (0, 0))
             if self.show_info:
                 for panel in self.panels:
                     if panel.caption:
                         x, y, w, h = panel.rect
-                        self._draw_text(self.caption_font, panel.caption,
+                        self._draw_text(self.caption_font, panel.caption, avoid_clock=True,
                                         bottomright=(x + w - self.margin, y + h - self.margin))
         else:
             self.surface.fill(self.background)
@@ -994,7 +1051,7 @@ class Screen:
         elif self.settings.show_music_hint and (hint := self.music.hint_text()):
             anchor = "topright" if self.settings.now_playing_position == "top-right" else "topleft"
             x = self.size[0] - self.margin if anchor == "topright" else self.margin
-            self._draw_text(self.small_font, hint, **{anchor: (x, self.margin)})
+            self._draw_text(self.small_font, hint, avoid_clock=True, **{anchor: (x, self.margin)})
 
     def _draw_now_playing(self, info):
         """A small card in a top corner: artwork, title, artist and app."""
@@ -1013,7 +1070,8 @@ class Screen:
         height = art_size + pad * 2
         x = (self.size[0] - self.margin - width if self.settings.now_playing_position == "top-right"
              else self.margin)
-        y = self.margin
+        x, y = clear_of(pygame.Rect(x, self.margin, width, height), self.clock_rect,
+                        self.size[1], self.margin // 2).topleft
 
         card = pygame.Surface((width, height), pygame.SRCALPHA)
         pygame.draw.rect(card, (0, 0, 0, 150), card.get_rect(), border_radius=pad)
@@ -1051,18 +1109,32 @@ class Screen:
         self._artwork = (path, mtime, surface)
         return surface
 
-    def _draw_clock(self):
-        self.clock_text = time.strftime(self.settings.clock_format)
-        self._draw_text(self.clock_font, self.clock_text,
-                        bottomleft=(self.margin, self.size[1] - self.margin))
+    # ---- clock
 
-    def _draw_text(self, font, text, **anchor):
+    def _clock_layout(self):
+        """(block rect, [(font, text, rect)]) for the time and the optional date line."""
+        lines = [(self.clock_font, time.strftime(self.settings.clock_format))]
+        if self.settings.show_date:
+            lines.append((self.date_font, time.strftime(self.settings.clock_date_format)))
+        block, rects = place_block([font.size(text) for font, text in lines],
+                                   self.settings.clock_position, self.size, self.margin)
+        return block, [(font, text, rect) for (font, text), rect in zip(lines, rects, strict=True)]
+
+    def _draw_clock(self):
+        _, lines = self._clock_layout()
+        self.clock_text = lines[0][1]
+        for font, text, rect in lines:
+            self._draw_text(font, text, topleft=rect.topleft)
+
+    def _draw_text(self, font, text, avoid_clock=False, **anchor):
         """Subtle, slightly translucent text with a soft shadow, legible on any photo."""
         fg = font.render(text, True, (240, 240, 240))
         shadow = font.render(text, True, (0, 0, 0))
         fg.set_alpha(215)
         shadow.set_alpha(150)
         rect = fg.get_rect(**anchor)
+        if avoid_clock:
+            rect = clear_of(rect, self.clock_rect, self.size[1], self.margin // 2)
         offset = max(1, font.get_height() // 18)
         self.surface.blit(shadow, rect.move(offset, offset))
         self.surface.blit(fg, rect)

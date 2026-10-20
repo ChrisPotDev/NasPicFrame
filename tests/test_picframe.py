@@ -249,3 +249,52 @@ def test_ellipsize():
     assert picframe.ellipsize(font, "short", 500) == "short"
     long = picframe.ellipsize(font, "a very long track title that will not fit", 80)
     assert long.endswith("\u2026") and font.size(long)[0] <= 80
+
+
+# --------------------------------------------------------------------------- clock layout
+
+def test_clock_size_parsing():
+    assert picframe.parse_clock_size("medium") == pytest.approx(1 / 14)
+    assert picframe.parse_clock_size(" Large ") == pytest.approx(1 / 9)
+    assert picframe.parse_clock_size("12%") == pytest.approx(0.12)
+    for bad in ("giant", "1%", "60%", ""):
+        with pytest.raises(SystemExit):
+            picframe.parse_clock_size(bad)
+
+
+def test_clock_settings_defaults_and_overrides(tmp_path):
+    s = picframe.Settings(TEMPLATE)
+    assert s.clock_position == "bottom-left" and s.show_date is False
+    assert s.clock_size == pytest.approx(1 / 14)  # unchanged from before the option existed
+    path = write_config(tmp_path, "[overlay]\nclock_size = huge\nclock_position = top-center\nshow_date = yes\n")
+    s = picframe.Settings(path)
+    assert s.clock_size == pytest.approx(1 / 6) and s.clock_position == "top-center" and s.show_date
+
+
+@pytest.mark.parametrize("position, topleft", [
+    ("bottom-left", (20, 1080 - 20 - 130)), ("bottom-right", (1920 - 20 - 300, 930)),
+    ("top-center", ((1920 - 300) // 2, 20)), ("top-right", (1600, 20)),
+])
+def test_place_block_positions(position, topleft):
+    block, lines = picframe.place_block([(300, 100), (200, 30)], position, (1920, 1080), 20)
+    assert block.size == (300, 130) and block.topleft == topleft
+    assert lines[1].top == lines[0].bottom  # date line directly under the time
+
+
+def test_place_block_centres_lines():
+    block, (time_line, date_line) = picframe.place_block(
+        [(300, 100), (200, 30)], "bottom-center", (1920, 1080), 20)
+    assert time_line.centerx == date_line.centerx == block.centerx
+
+
+def test_clear_of_moves_away_from_clock():
+    clock = pygame.Rect(1600, 930, 300, 130)  # bottom-right
+    caption = pygame.Rect(1500, 1000, 400, 40)
+    moved = picframe.clear_of(caption, clock, 1080, 10)
+    assert moved.bottom == clock.top - 10 and not moved.colliderect(clock)
+    top_clock = pygame.Rect(20, 20, 300, 130)
+    card = pygame.Rect(0, 20, 500, 80)
+    assert picframe.clear_of(card, top_clock, 1080, 10).top == top_clock.bottom + 10
+    assert picframe.clear_of(caption, None, 1080, 10) == caption
+    elsewhere = pygame.Rect(20, 20, 100, 40)
+    assert picframe.clear_of(elsewhere, clock, 1080, 10) == elsewhere
