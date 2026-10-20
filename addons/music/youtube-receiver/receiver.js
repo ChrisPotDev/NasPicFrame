@@ -13,7 +13,8 @@ import { MpvClient } from './mpv.js';
 import { MpvPlayer } from './player.js';
 import { StreamResolver, ytdlpRunner } from './resolver.js';
 import {
-  DIAL_PORT, artworkUrl, cleanArtist, formatPairingCode, mpvArgs, readConfig, stateName,
+  DIAL_PORT, WARMUP_VIDEO_ID, artworkUrl, cleanArtist, formatPairingCode, mpvArgs, readConfig,
+  stateName,
 } from './util.js';
 
 const cfg = readConfig(process.env);
@@ -123,6 +124,11 @@ receiver.on('terminate', (error) => {
 });
 await receiver.start();
 log(`Ready as "${cfg.name}" (DIAL port ${DIAL_PORT})`);
+
+// Warm-up: yt-dlp's first lookup after a start also fetches and decodes YouTube's
+// player code (~25 s on a Pi 3 instead of ~12 s). Pay that now, before anyone casts.
+log('Warming up yt-dlp');
+resolver.prefetch(WARMUP_VIDEO_ID);
 
 // "Link with TV code": lets guests on another network (or mobile data) connect.
 // Codes refresh every five minutes; the service stops on error, so restart it.

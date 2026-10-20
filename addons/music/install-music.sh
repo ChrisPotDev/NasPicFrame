@@ -57,6 +57,10 @@ systemctl disable --now raspotify.service 2>/dev/null || true
 systemctl disable --now shairport-sync.service 2>/dev/null || true
 
 echo "==> Installing add-on to $DEST"
+# On an upgrade, stop the music services while their files are replaced, so they
+# don't crash and restart against a half-installed copy. Started again at the end.
+as_user systemctl --user stop music-coordinator.service music-youtube.service \
+    music-spotify.service music-airplay.service 2>/dev/null || true
 install -d "$DEST/youtube-receiver"
 install -m 755 "$SRC"/coordinator.py "$SRC"/launch.py "$SRC"/musicconf.py \
     "$SRC"/spotify_event.py "$SRC"/update-ytdlp.sh "$SRC"/music-logs.sh "$DEST/"

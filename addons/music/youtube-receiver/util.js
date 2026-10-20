@@ -2,6 +2,10 @@
 
 export const DIAL_PORT = 3000;
 
+// "Me at the zoo", YouTube's first video: tiny, and not going anywhere. Looked up once
+// at start-up to warm yt-dlp's caches (also used by update-ytdlp.sh's test).
+export const WARMUP_VIDEO_ID = 'jNQXAC9IVRw';
+
 export function readConfig(env) {
   const cfg = JSON.parse(env.MUSIC_CONFIG || '{}');
   return {
