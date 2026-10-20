@@ -7,3 +7,7 @@
 
 # Public share, no username or password (guest access) - see README "Public shares":
 #//192.168.1.10/Public  /mnt/photos  cifs  guest,uid=1000,gid=1000,ro,vers=3.0,iocharset=utf8,file_mode=0444,dir_mode=0555,soft,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30,x-systemd.after=network-online.target  0  0
+
+# Same public share, mounted in your home folder instead of /mnt/photos.
+# Then set image_dir = /home/pi/NasPhotos in /etc/picframe/config.ini.
+#//192.168.1.10/share  /home/pi/NasPhotos  cifs  guest,uid=1000,gid=1000,ro,vers=3.0,iocharset=utf8,file_mode=0444,dir_mode=0555,soft,_netdev,nofail,noauto,x-systemd.automount,x-systemd.mount-timeout=30,x-systemd.after=network-online.target  0  0
