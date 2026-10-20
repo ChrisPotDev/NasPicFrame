@@ -96,7 +96,9 @@ if command -v nmcli >/dev/null; then
     done
 fi
 for dev in /sys/class/net/wl*; do
-    [ -e "$dev" ] && iw dev "$(basename "$dev")" set power_save off 2>/dev/null || true
+    if [ -e "$dev" ]; then
+        iw dev "$(basename "$dev")" set power_save off 2>/dev/null || true
+    fi
 done
 
 echo "==> User services"
