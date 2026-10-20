@@ -61,9 +61,9 @@ install -d "$DEST/youtube-receiver"
 install -m 755 "$SRC"/coordinator.py "$SRC"/launch.py "$SRC"/musicconf.py \
     "$SRC"/spotify_event.py "$SRC"/update-ytdlp.sh "$SRC"/music-logs.sh "$DEST/"
 ln -sf "$DEST/music-logs.sh" /usr/local/bin/music-logs
+# Every module (*.js), not a fixed list, so a newly added one is never left behind.
 install -m 644 "$SRC"/youtube-receiver/package.json "$SRC"/youtube-receiver/package-lock.json \
-    "$SRC"/youtube-receiver/receiver.js "$SRC"/youtube-receiver/player.js \
-    "$SRC"/youtube-receiver/mpv.js "$SRC"/youtube-receiver/util.js "$DEST/youtube-receiver/"
+    "$SRC"/youtube-receiver/*.js "$DEST/youtube-receiver/"
 install -m 644 "$SRC/music.ini" "$DEST/music.default.ini"
 # Files edited on Windows may have CRLF line endings; strip them.
 sed -i 's/\r$//' "$DEST"/*.py "$DEST"/*.sh "$DEST/music.default.ini"
