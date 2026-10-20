@@ -190,6 +190,12 @@ CI: ShellCheck for the scripts, Node tests for the receiver, pytest for the coor
 
 Each check takes about an hour on the target Pi 3 with Trixie. Results go back into this document.
 
+**Hardware test log**
+
+| Date | Result |
+|---|---|
+| 2026-10-20 | Pi 3 Model B, Trixie, speaker named "Patio". ✅ **YouTube Music cast from Android (Samsung) plays.** Discovery over DIAL, connection and play commands all work; yt-dlp fetches the audio (P3 passes for the first track). Bugs found and fixed on the way: yt-dlp was never installed (`update-ytdlp.sh` exited silently under `set -e`; `HOME` under sudo); mpv socket timeout too short on a busy Pi 3; `journalctl --user` doesn't work on Pi OS (added `music-logs`); the Pi 3 jack's Trixie sink name (`…mailbox.stereo-fallback`) wasn't recognised. Open: the USB DAC isn't visible to PipeWire (P6). Library warning `[YOUTUBEJS] Failed to extract … decipher function` is seen; watch whether the queue and autoplay advance. |
+
 | # | Check | If it fails |
 |---|---|---|
 | P1 | Multiple phones in one session, sharing a queue, from the **YouTube Music** app | Single sender only, still useful |

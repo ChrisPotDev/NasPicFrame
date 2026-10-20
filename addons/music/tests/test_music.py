@@ -140,6 +140,7 @@ def test_airplay_config_escapes_and_password(tmp_path):
     assert 'name = "The \\"Best\\" Room";' in conf
     assert 'password = "hunter2";' in conf
     assert 'application_name = "picframe-airplay"' in conf
+    assert 'dbus_service_bus = "session";' in conf and 'mpris_service_bus = "session";' in conf
 
 
 def test_youtube_command_passes_settings():

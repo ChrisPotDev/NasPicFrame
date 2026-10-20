@@ -34,7 +34,10 @@ def _conf_string(value):
 def shairport_config(settings, runtime):
     """shairport-sync config: name, PulseAudio/PipeWire output, metadata pipe."""
     general = [f"name = {_conf_string(settings.names['airplay'])};",
-               'output_backend = "pa";']
+               'output_backend = "pa";',
+               # A user service may not register on the system bus; use the session bus.
+               'dbus_service_bus = "session";',
+               'mpris_service_bus = "session";']
     if settings.airplay_password:
         general.append(f"password = {_conf_string(settings.airplay_password)};")
     pipe = os.path.join(runtime, "shairport-metadata")
