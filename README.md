@@ -250,7 +250,8 @@ Any space a photo doesn't cover is filled with a version of the same photo. The 
 
 - **Date:** read from the EXIF *DateTimeOriginal* tag, falling back to *DateTime*, and formatted with `date_format`.
 - **Place:** read from the EXIF GPS data. By default (`geocode = no`) it shows coordinates, and nothing leaves the Pi. With `geocode = nominatim` it shows *"Town, Country"* from OpenStreetMap's Nominatim service. Coordinates are rounded to about 100 m before they are sent, requests stay under Nominatim's limit of one per second, and results are cached in `~/.cache/picframe/geocode.json`, so each place is looked up only once.
-- The caption sits in the bottom-right corner **of the photo itself**; each photo in a pair has its own caption. The clock is in the bottom-left corner of the screen. Both use slightly translucent text with a soft shadow, so they are readable on any photo without drawing attention.
+- The caption sits in the bottom-right corner **of the photo itself**; each photo in a pair has its own caption. Both captions and clock use slightly translucent text with a soft shadow, so they are readable on any photo without drawing attention.
+- **Clock:** `clock_size` is `small`, `medium` (the default), `large`, `huge`, or a percentage of the screen height such as `12%`. `clock_position` is any corner or the top or bottom centre (`bottom-left` by default). `show_date = yes` adds a smaller date line under the time, formatted with `clock_date_format`, e.g. *Tuesday 20 October*. If the clock shares an edge with a caption, the caption moves up or down out of its way.
 - Photos without EXIF data, such as screenshots or many photos saved from messaging apps, just get no caption.
 
 ## Step 4: Display power management
