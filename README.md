@@ -284,7 +284,11 @@ The built-in schedule is still the better choice. It also pauses the slideshow a
 
 ## Step 5: Start automatically (systemd)
 
-`/etc/systemd/system/picframe.service` (installed by `install.sh` with your user and UID filled in):
+The slideshow runs as a systemd service, `picframe.service`. It starts at boot, waits for the network and the share, and restarts if it crashes. **`install.sh` has already installed and enabled it** (Step 1). This step explains the file, how to install it by hand if you skipped the installer, and how to check that it works.
+
+### 5a. The service file
+
+`/etc/systemd/system/picframe.service`, as installed with your user and UID filled in (here `pi` and `1000`):
 
 ```ini
 [Unit]
@@ -319,6 +323,78 @@ Design notes:
 - **Why not `RequiresMountsFor=/mnt/photos`?** If the NAS is off at boot, that dependency fails, and **`Restart=` does not retry dependency failures**, so the frame would stay dark until someone rebooted it. Here the service always starts, and the app shows the "waiting" screen until the NAS appears.
 - **Restarts after crashes.** `Restart=always` with `RestartSec=10` and `StartLimitIntervalSec=0` means systemd never gives up.
 - It runs as **your user** inside the autologin desktop session (`XDG_RUNTIME_DIR` / `WAYLAND_DISPLAY`). That is what lets it draw on the screen and call `wlopm`.
+
+### 5b. Installing it by hand (only if you didn't run `install.sh`)
+
+The repository's `picframe.service` has two placeholders, `@USER@` and `@UID@`. Fill them in with your own user and copy the file into place. Run this from the repository folder, as the desktop user (not root):
+
+```bash
+sed -e "s/@USER@/$USER/g" -e "s/@UID@/$(id -u)/g" picframe.service \
+  | sudo tee /etc/systemd/system/picframe.service > /dev/null
+sudo systemctl daemon-reload                 # make systemd read the new file
+sudo systemctl enable picframe.service       # start it at every boot
+```
+
+The app itself must be at `/opt/picframe/picframe.py` and the config at `/etc/picframe/config.ini`, as `install.sh` places them. Desktop autologin must also be on (`sudo raspi-config nonint do_boot_behaviour B4`), because the service draws on the logged-in desktop.
+
+Check the file before starting it:
+```bash
+systemctl cat picframe                                      # the file systemd actually uses
+sudo systemd-analyze verify /etc/systemd/system/picframe.service   # no output = no problems
+```
+
+### 5c. Start it and check it's working
+
+You don't need to reboot to test it. Start it and watch the log:
+
+```bash
+sudo systemctl start picframe
+systemctl status picframe        # should say "active (running)"; press q to exit
+journalctl -u picframe -f        # live log; Ctrl+C to stop watching
+```
+
+A healthy start looks like this:
+
+```
+INFO Display session ready (wayland-0)
+INFO Photo directories ready: /mnt/photos
+INFO Display power method: wlopm
+INFO Screen 1920x1080 (x11)
+INFO Found 2481 photos in /mnt/photos
+```
+
+The slideshow should now be on the screen. If `status` says *activating (start-pre)*, the service is still in its waiting step (for the desktop or the share), which can take up to 120 s. The log shows what it's waiting for.
+
+### 5d. Test that it recovers by itself
+
+These checks confirm the frame looks after itself before you leave it alone. Each takes a minute or two.
+
+| Test | How | Expected |
+|---|---|---|
+| **Crash recovery** | `sudo systemctl kill -s KILL picframe` | The slideshow disappears and comes back about 10 s later. `systemctl show picframe -p NRestarts` counts up. |
+| **Boot** | `sudo reboot` | The slideshow appears after boot, without anyone logging in. `journalctl -b -u picframe` shows this boot's log. |
+| **NAS off at boot** | Switch the NAS off (or unplug its network), then `sudo reboot` | The Pi boots and shows the *"Waiting for photos…"* placeholder. Switch the NAS back on; photos appear within about a minute, without a reboot. |
+| **NAS drops while running** | Switch the NAS off for a few minutes, then on again | The current photo stays up (or the placeholder appears). The slideshow resumes by itself. |
+| **Night mode** | Set `sleep_time` to two minutes from now in `/etc/picframe/config.ini` | The app restarts itself within 5 s of saving. At the set time the screen turns off (log: `Display off (wlopm)`). Put the real time back afterwards. |
+| **Config changes** | Change `delay` in the config and save | Log: `Config file changed - restarting`. The new delay applies. |
+
+### 5e. Everyday commands
+
+```bash
+sudo systemctl restart picframe          # restart (e.g. after changing fstab)
+sudo systemctl stop picframe             # stop until next boot (also turns the screen back on)
+sudo systemctl disable --now picframe    # stop and don't start at boot any more
+sudo systemctl enable --now picframe     # start now and at every boot again
+journalctl -u picframe --since "1 hour ago"   # recent log
+```
+
+**Running it by hand for debugging:** stop the service first, so two copies don't fight over the screen, then run it in the foreground with debug logging. Run this as the desktop user over SSH:
+```bash
+sudo systemctl stop picframe
+XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-0 \
+  python3 /opt/picframe/picframe.py --config /etc/picframe/config.ini -v
+# Ctrl+C to quit, then: sudo systemctl start picframe
+```
 
 ## Step 6: Home Assistant (MQTT)
 
