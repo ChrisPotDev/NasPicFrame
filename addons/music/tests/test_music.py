@@ -149,6 +149,7 @@ def test_youtube_command_passes_settings():
     cfg = json.loads(env["MUSIC_CONFIG"])
     assert cfg["names"]["youtube"] == "Living Room" and cfg["start_volume"] == 40
     assert env["MUSIC_RUNTIME_DIR"] == "/run/x"
+    assert env["YTDLP_JS_RUNTIME"] in ("node",) or env["YTDLP_JS_RUNTIME"].startswith("deno:")
 
 
 # --------------------------------------------------------------------------- Spotify events

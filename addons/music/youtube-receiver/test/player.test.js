@@ -19,7 +19,8 @@ class FakeMpv extends EventEmitter {
       const id = ++this.entry;
       setImmediate(() => {
         this.emit('event', { event: 'start-file', playlist_entry_id: id });
-        if (this.loadSucceeds) this.emit('event', { event: 'file-loaded' });
+        const ok = typeof this.loadSucceeds === 'function' ? this.loadSucceeds(args[1]) : this.loadSucceeds;
+        if (ok) this.emit('event', { event: 'file-loaded' });
         else this.emit('event', { event: 'end-file', reason: 'error', playlist_entry_id: id });
       });
     }
@@ -83,4 +84,53 @@ test('doStop cancels a pending load', async () => {
   await player.doStop();
   assert.equal(await playing, false);
   assert.ok(mpv.commands.some((c) => c[0] === 'stop'));
+});
+
+function fakeResolver({ url = (id) => `https://media.example/${id}`, fails = false } = {}) {
+  const forgotten = [];
+  return {
+    forgotten,
+    get: async (id) => {
+      if (fails) throw new Error('lookup failed');
+      return url(id);
+    },
+    forget: (id) => forgotten.push(id),
+  };
+}
+
+test('plays the resolved stream URL directly', async () => {
+  const mpv = new FakeMpv();
+  const player = new MpvPlayer(mpv, { startVolume: 40, resolver: fakeResolver() });
+  assert.equal(await player.doPlay({ id: 'abc' }, 0), true);
+  assert.deepEqual(mpv.commands[0], ['loadfile', 'https://media.example/abc', 'replace']);
+  assert.equal(mpv.commands.filter((c) => c[0] === 'loadfile').length, 1);
+});
+
+test('falls back to the watch URL when the lookup fails', async () => {
+  const mpv = new FakeMpv();
+  const player = new MpvPlayer(mpv, { startVolume: 40, resolver: fakeResolver({ fails: true }) });
+  assert.equal(await player.doPlay({ id: 'abc' }, 0), true);
+  assert.deepEqual(mpv.commands[0], ['loadfile', 'https://www.youtube.com/watch?v=abc', 'replace']);
+});
+
+test('an expired stream URL is forgotten and the watch URL tried', async () => {
+  const mpv = new FakeMpv({ loadSucceeds: (url) => !url.startsWith('https://media.example/') });
+  const resolver = fakeResolver();
+  const player = new MpvPlayer(mpv, { startVolume: 40, resolver });
+  assert.equal(await player.doPlay({ id: 'abc' }, 0), true);
+  const loads = mpv.commands.filter((c) => c[0] === 'loadfile').map((c) => c[1]);
+  assert.deepEqual(loads, ['https://media.example/abc', 'https://www.youtube.com/watch?v=abc']);
+  assert.deepEqual(resolver.forgotten, ['abc']);
+});
+
+test('a play superseded during the lookup does nothing', async () => {
+  const mpv = new FakeMpv();
+  let release;
+  const resolver = { get: () => new Promise((r) => { release = r; }), forget() {} };
+  const player = new MpvPlayer(mpv, { startVolume: 40, resolver });
+  const first = player.doPlay({ id: 'abc' }, 0);
+  await player.doStop();
+  release('https://media.example/abc');
+  assert.equal(await first, false);
+  assert.equal(mpv.commands.filter((c) => c[0] === 'loadfile').length, 0);
 });

@@ -10,6 +10,8 @@ export function readConfig(env) {
     idleClearMinutes: Math.max(0, Number(cfg.idle_clear_minutes ?? 30)),
     runtimeDir: env.MUSIC_RUNTIME_DIR || '/tmp/picframe-music',
     ytdlpPath: env.YTDLP_PATH || 'yt-dlp',
+    // yt-dlp's JavaScript runtime for YouTube: Deno (installed with yt-dlp) or Node.
+    jsRuntime: env.YTDLP_JS_RUNTIME || 'node',
     controlPort: Number(env.CONTROL_PORT || 8766),
   };
 }
@@ -20,7 +22,7 @@ export function clampPercent(value) {
 }
 
 // mpv runs once for the receiver's lifetime and is driven over its JSON IPC socket.
-export function mpvArgs({ socketPath, ytdlpPath, startVolume }) {
+export function mpvArgs({ socketPath, ytdlpPath, jsRuntime = 'node', startVolume }) {
   return [
     '--idle=yes',
     '--no-video',
@@ -36,8 +38,8 @@ export function mpvArgs({ socketPath, ytdlpPath, startVolume }) {
     '--volume-max=100',
     '--ytdl-format=bestaudio/best',
     `--script-opts=ytdl_hook-ytdl_path=${ytdlpPath}`,
-    // Current yt-dlp needs a JavaScript runtime for YouTube; Node is already here.
-    '--ytdl-raw-options=js-runtimes=node',
+    // Current yt-dlp needs a JavaScript runtime to solve YouTube's challenges.
+    `--ytdl-raw-options=js-runtimes=${jsRuntime}`,
     // Keep memory use modest on a 1 GB Pi.
     '--demuxer-max-bytes=20MiB',
     '--demuxer-max-back-bytes=5MiB',

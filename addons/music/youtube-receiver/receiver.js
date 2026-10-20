@@ -11,6 +11,7 @@ import path from 'node:path';
 import YouTubeCastReceiver from 'yt-cast-receiver';
 import { MpvClient } from './mpv.js';
 import { MpvPlayer } from './player.js';
+import { StreamResolver, ytdlpRunner } from './resolver.js';
 import {
   DIAL_PORT, artworkUrl, cleanArtist, formatPairingCode, mpvArgs, readConfig, stateName,
 } from './util.js';
@@ -35,15 +36,27 @@ function writeJson(file, data) {
 
 const mpv = new MpvClient(
   mpvArgs({ socketPath: path.join(cfg.runtimeDir, 'mpv.sock'), ytdlpPath: cfg.ytdlpPath,
-            startVolume: cfg.startVolume }),
+            jsRuntime: cfg.jsRuntime, startVolume: cfg.startVolume }),
   path.join(cfg.runtimeDir, 'mpv.sock'));
 mpv.on('exit', (code, signal) => {
   log(`mpv exited (${code ?? signal}) - restarting via systemd`);
   process.exit(1);
 });
 await mpv.start();
+log(`yt-dlp JavaScript runtime: ${cfg.jsRuntime}`);
 
-const player = new MpvPlayer(mpv, { startVolume: cfg.startVolume });
+const resolver = new StreamResolver({
+  run: ytdlpRunner({ ytdlpPath: cfg.ytdlpPath, jsRuntime: cfg.jsRuntime }),
+  log,
+});
+const player = new MpvPlayer(mpv, { startVolume: cfg.startVolume, resolver });
+
+// While a song plays, look up the next one (or the autoplay pick) so it starts at once.
+player.on('state', ({ current }) => {
+  const queue = current.queue ?? {};
+  resolver.prefetch(queue.current?.id);
+  resolver.prefetch((queue.next ?? queue.autoplay)?.id);
+});
 player.on('finished', async () => {
   await player.pause();
   await player.next();

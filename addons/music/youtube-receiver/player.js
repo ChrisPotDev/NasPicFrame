@@ -11,9 +11,12 @@ export class MpvPlayer extends Player {
   #loadToken = 0;
   #entryId = null;
 
-  constructor(mpv, { startVolume }) {
+  #resolver;
+
+  constructor(mpv, { startVolume, resolver = null }) {
     super();
     this.#mpv = mpv;
+    this.#resolver = resolver;
     this.#volume = { level: startVolume, muted: false };
     this.currentVideo = null;
     mpv.on('event', (msg) => {
@@ -52,18 +55,43 @@ export class MpvPlayer extends Player {
   async doPlay(video, position) {
     const token = ++this.#loadToken;
     this.currentVideo = video;
+    const log = this.logger ?? console;
+
+    // Preferred: the stream URL from the resolver (usually prefetched, so instant).
+    // Fallback: the watch URL, which mpv resolves itself through yt-dlp.
+    let url = null;
+    if (this.#resolver) {
+      try {
+        url = await this.#resolver.get(video.id);
+      } catch (error) {
+        log.warn(`[picframe] Lookup failed for ${video.id} (${error.message}); letting mpv try`);
+      }
+      if (token !== this.#loadToken) return false; // superseded while looking up
+    }
+    if (url && (await this.#load(url, token))) return this.#started(position);
+    if (token !== this.#loadToken) return false;
+    if (url) this.#resolver.forget(video.id); // e.g. an expired link
+
+    if (await this.#load(videoUrl(video.id), token)) return this.#started(position);
+    if (token === this.#loadToken) {
+      log.warn(`[picframe] Could not play ${video.id}: yt-dlp failed or timed out (test it with /opt/picframe-music/update-ytdlp.sh)`);
+    }
+    return false;
+  }
+
+  async #load(url, token) {
     const loaded = this.#waitForLoad(token);
     try {
       await this.#mpv.setProperty('pause', false);
-      await this.#mpv.command('loadfile', videoUrl(video.id), 'replace');
+      await this.#mpv.command('loadfile', url, 'replace');
     } catch (error) {
       (this.logger ?? console).error('[picframe] loadfile failed:', error);
       return false;
     }
-    if (!(await loaded)) {
-      (this.logger ?? console).warn(`[picframe] Could not play ${video.id}: yt-dlp failed or timed out (test it with /opt/picframe-music/update-ytdlp.sh)`);
-      return false;
-    }
+    return loaded;
+  }
+
+  async #started(position) {
     if (position > 0) {
       await this.#mpv.command('seek', position, 'absolute').catch(() => {});
     }

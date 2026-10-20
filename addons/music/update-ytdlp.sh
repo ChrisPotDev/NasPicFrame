@@ -27,8 +27,16 @@ fi
 pip() { "$VENV/bin/python" -m pip --disable-pip-version-check --quiet "$@"; }
 # Empty when not installed. (`pip show` fails then; that must not end the script.)
 version() { { "$VENV/bin/python" -m pip show yt-dlp 2>/dev/null || true; } | awk '/^Version:/ {print $2}'; }
+# yt-dlp needs a JavaScript runtime for YouTube; Deno is the one it recommends.
+js_runtime() {
+    if [ -x "$VENV/bin/deno" ] && "$VENV/bin/deno" --version >/dev/null 2>&1; then
+        echo "deno:$VENV/bin/deno"
+    else
+        echo "node"
+    fi
+}
 smoke_test() {
-    timeout 180 "$VENV/bin/yt-dlp" --quiet --no-warnings --js-runtimes node \
+    timeout 180 "$VENV/bin/yt-dlp" --quiet --no-warnings --js-runtimes "$(js_runtime)" \
         -f bestaudio --get-url "$TEST_URL" >/dev/null
 }
 
@@ -45,6 +53,12 @@ if ! pip install --upgrade "yt-dlp[default]"; then
     exit 1
 fi
 current="$(version)"
+
+if pip install --upgrade deno; then
+    echo "JavaScript runtime: Deno $("$VENV/bin/deno" --version 2>/dev/null | awk 'NR==1 {print $2}')"
+else
+    echo "Deno not available for this system; yt-dlp will try Node instead" >&2
+fi
 
 if [ "${YTDLP_SKIP_TEST:-}" = "1" ]; then   # CI: GitHub's servers are blocked by YouTube
     echo "yt-dlp $current installed (test skipped)"

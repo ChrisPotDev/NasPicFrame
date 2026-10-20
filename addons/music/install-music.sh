@@ -38,7 +38,7 @@ esac
 echo "==> Installing packages"
 apt-get update
 apt-get install -y mpv nodejs npm python3-venv python3-paho-mqtt pulseaudio-utils \
-    shairport-sync avahi-daemon curl ca-certificates
+    shairport-sync avahi-daemon curl ca-certificates iw
 # AirPlay 2 timing helper; only needed (and only packaged) where shairport-sync has AirPlay 2.
 apt-get install -y nqptp 2>/dev/null || echo "    (nqptp not available - AirPlay 1 only, fine for one room)"
 
@@ -84,6 +84,20 @@ fi
 # the AirPlay and MQTT passwords.
 chown "root:$FRAME_GROUP" "$CONFIG"
 chmod 640 "$CONFIG"
+
+echo "==> Wi-Fi power saving off"
+# Power saving makes the Pi slow to answer phones' cast commands (and the NAS).
+# Persist it in NetworkManager, and apply it now without reconnecting.
+if command -v nmcli >/dev/null; then
+    nmcli -t -f NAME,TYPE connection show --active | while IFS=: read -r name type; do
+        if [ "$type" = "802-11-wireless" ]; then
+            nmcli connection modify "$name" 802-11-wireless.powersave 2 && echo "    \"$name\": off"
+        fi
+    done
+fi
+for dev in /sys/class/net/wl*; do
+    [ -e "$dev" ] && iw dev "$(basename "$dev")" set power_save off 2>/dev/null || true
+done
 
 echo "==> User services"
 loginctl enable-linger "$FRAME_USER"   # user services run from boot, before/without login

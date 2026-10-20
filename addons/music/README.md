@@ -54,6 +54,7 @@ Changes take effect within about 5 seconds; the receivers restart with the new s
 ## How it behaves
 
 - **One source at a time.** If someone starts Spotify while YouTube is playing, YouTube pauses. If an iPhone AirPlays during Spotify, the Spotify guest's app shows *disconnected*. Spotify and AirPlay have no "pause this guest" command, so the session is ended instead.
+- **Song changes.** Looking up a YouTube song takes about 10 s on a Pi 3, so while one song plays, the next in the queue is looked up in advance; when it starts, it plays almost at once. A song you pick yourself, not already queued, still takes those ~10 s to start.
 - **Several phones, one YouTube queue.** Guests casting from YouTube Music all add to the same queue, as with a smart TV.
 - **Volume.** Each phone's volume slider controls 0% up to `max_volume` (or `quiet_max_volume` at night). The cap is applied to the output itself, so nothing can exceed it.
 - **On the frame:** while music plays, a small card shows the artwork, title, artist and app (top-right). When nothing is playing, a one-line hint shows the speaker name and the YouTube TV code. Turn these off with `show_now_playing = no` / `show_music_hint = no` in the frame's `config.ini`. Music doesn't wake the screen at night.
@@ -86,6 +87,7 @@ pactl list short sinks                       # audio outputs PipeWire can see
 |---|---|
 | The Pi doesn't appear on a phone | Is the phone on the same Wi-Fi (not an isolated guest network)? For YouTube, try "Link with TV code". |
 | YouTube connects but nothing plays | yt-dlp can't fetch the audio. Run `/opt/picframe-music/update-ytdlp.sh`; if it still fails, YouTube has changed and a yt-dlp fix usually follows within days. AirPlay keeps working meanwhile. |
+| Songs are slow to start | A song you picked yourself takes ~10 s on a Pi 3; queued songs should start almost at once. `music-logs -n 50 \| grep "Looked up"` shows the lookup times. Check Wi-Fi power saving is off: `iw dev wlan0 get power_save`. |
 | Sound comes from the screen, not the amp | Set `output = usb` or `headphones`. Check `pactl list short sinks` lists the DAC. |
 | Hiss or crackle on the headphone jack | Expected on the Pi 3's jack; use a USB DAC. |
 | Two songs at once | Check `music-logs -n 100` and report it: the coordinator should stop one of them. |

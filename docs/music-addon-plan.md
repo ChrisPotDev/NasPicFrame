@@ -195,6 +195,7 @@ Each check takes about an hour on the target Pi 3 with Trixie. Results go back i
 | Date | Result |
 |---|---|
 | 2026-10-20 | Pi 3 Model B, Trixie, speaker named "Patio". ✅ **YouTube Music cast from Android (Samsung) plays.** Discovery over DIAL, connection and play commands all work; yt-dlp fetches the audio (P3 passes for the first track). Bugs found and fixed on the way: yt-dlp was never installed (`update-ytdlp.sh` exited silently under `set -e`; `HOME` under sudo); mpv socket timeout too short on a busy Pi 3; `journalctl --user` doesn't work on Pi OS (added `music-logs`); the Pi 3 jack's Trixie sink name (`…mailbox.stereo-fallback`) wasn't recognised. Open: the USB DAC isn't visible to PipeWire (P6). Library warning `[YOUTUBEJS] Failed to extract … decipher function` is seen; watch whether the queue and autoplay advance. |
+| 2026-10-20 | Queue advances (`next` works). **Song changes slow, 12–16 s.** Measured: the yt-dlp lookup takes 10.4 s on the Pi 3; the network is fine (0.6 s to first byte, 2.5 MB/s); Wi-Fi power saving was on. yt-dlp also rejected Node as its JavaScript runtime. Fixes: prefetch the next queued song, share in-flight lookups (play → stop → play), cache stream URLs for 2 h, Deno from PyPI as the runtime (Node fallback), Wi-Fi power saving off in the installer. |
 
 | # | Check | If it fails |
 |---|---|---|

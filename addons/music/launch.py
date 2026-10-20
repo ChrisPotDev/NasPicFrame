@@ -23,8 +23,18 @@ def runtime_dir():
     return path
 
 
+VENV = "~/.local/share/picframe-music/venv"
+
+
 def ytdlp_path():
-    return os.path.expanduser("~/.local/share/picframe-music/venv/bin/yt-dlp")
+    return os.path.expanduser(f"{VENV}/bin/yt-dlp")
+
+
+def js_runtime():
+    """yt-dlp's JavaScript runtime for YouTube: Deno (installed with yt-dlp by
+    update-ytdlp.sh, the one yt-dlp recommends) or Node as a fallback."""
+    deno = os.path.expanduser(f"{VENV}/bin/deno")
+    return f"deno:{deno}" if os.access(deno, os.X_OK) else "node"
 
 
 def _conf_string(value):
@@ -86,6 +96,7 @@ def build_command(source, settings, runtime):
             "MUSIC_CONFIG": json.dumps(settings.as_json()),
             "MUSIC_RUNTIME_DIR": runtime,
             "YTDLP_PATH": ytdlp_path(),
+            "YTDLP_JS_RUNTIME": js_runtime(),
             "CONTROL_PORT": str(YOUTUBE_CONTROL_PORT),
         })
 
