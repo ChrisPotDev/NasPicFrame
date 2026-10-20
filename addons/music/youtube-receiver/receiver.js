@@ -18,6 +18,10 @@ import {
 const cfg = readConfig(process.env);
 const log = (...args) => console.log('[picframe-youtube]', ...args);
 fs.mkdirSync(cfg.runtimeDir, { recursive: true });
+if (!fs.existsSync(cfg.ytdlpPath)) {
+  log(`ERROR: yt-dlp not found at ${cfg.ytdlpPath} - casting will connect but play nothing.`);
+  log('Fix: as the desktop user (not sudo) run /opt/picframe-music/update-ytdlp.sh');
+}
 const statePath = path.join(cfg.runtimeDir, 'youtube.json');
 const pairingPath = path.join(cfg.runtimeDir, 'youtube-pairing.json');
 

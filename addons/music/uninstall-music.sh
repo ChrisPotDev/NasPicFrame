@@ -18,7 +18,8 @@ FRAME_HOME="$(getent passwd "$FRAME_USER" | cut -d: -f6)"
 UNIT_DIR="$FRAME_HOME/.config/systemd/user"
 
 as_user() {
-    sudo -u "$FRAME_USER" XDG_RUNTIME_DIR="/run/user/$FRAME_UID" \
+    # HOME set explicitly: depending on sudo policy it may otherwise stay /root.
+    sudo -u "$FRAME_USER" HOME="$FRAME_HOME" XDG_RUNTIME_DIR="/run/user/$FRAME_UID" \
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$FRAME_UID/bus" "$@"
 }
 
@@ -33,6 +34,7 @@ as_user systemctl --user daemon-reload || true
 
 echo "==> Removing files"
 rm -rf /opt/picframe-music "$FRAME_HOME/.local/share/picframe-music" "$FRAME_HOME/.local/state/picframe-music"
+rm -f /usr/local/bin/music-logs
 rm -rf "/run/user/$FRAME_UID/picframe-music"
 rm -f "/run/user/$FRAME_UID/picframe/nowplaying.json" "/run/user/$FRAME_UID/picframe/music-hint.json"
 if [ "${1:-}" = "--purge" ]; then

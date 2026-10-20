@@ -22,7 +22,8 @@ CONFIG=/etc/picframe/music.ini
 
 # Run a command as the desktop user, inside their systemd/PipeWire session.
 as_user() {
-    sudo -u "$FRAME_USER" XDG_RUNTIME_DIR="/run/user/$FRAME_UID" \
+    # HOME set explicitly: depending on sudo policy it may otherwise stay /root.
+    sudo -u "$FRAME_USER" HOME="$FRAME_HOME" XDG_RUNTIME_DIR="/run/user/$FRAME_UID" \
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$FRAME_UID/bus" "$@"
 }
 
@@ -58,7 +59,8 @@ systemctl disable --now shairport-sync.service 2>/dev/null || true
 echo "==> Installing add-on to $DEST"
 install -d "$DEST/youtube-receiver"
 install -m 755 "$SRC"/coordinator.py "$SRC"/launch.py "$SRC"/musicconf.py \
-    "$SRC"/spotify_event.py "$SRC"/update-ytdlp.sh "$DEST/"
+    "$SRC"/spotify_event.py "$SRC"/update-ytdlp.sh "$SRC"/music-logs.sh "$DEST/"
+ln -sf "$DEST/music-logs.sh" /usr/local/bin/music-logs
 install -m 644 "$SRC"/youtube-receiver/package.json "$SRC"/youtube-receiver/package-lock.json \
     "$SRC"/youtube-receiver/receiver.js "$SRC"/youtube-receiver/player.js \
     "$SRC"/youtube-receiver/mpv.js "$SRC"/youtube-receiver/util.js "$DEST/youtube-receiver/"
@@ -95,7 +97,18 @@ done
 as_user systemctl --user daemon-reload
 
 echo "==> yt-dlp"
-as_user "$DEST/update-ytdlp.sh" || echo "    yt-dlp test failed - YouTube casting may not work until the next update"
+rm -rf /root/.local/share/picframe-music   # misplaced by an earlier installer version
+YTDLP="$FRAME_HOME/.local/share/picframe-music/venv/bin/yt-dlp"
+as_user "$DEST/update-ytdlp.sh" || true
+if [ ! -x "$YTDLP" ]; then
+    cat >&2 <<EOF
+
+!!! yt-dlp is NOT installed. YouTube casting will connect but play nothing.
+!!! Fix: as $FRAME_USER (without sudo) run:  /opt/picframe-music/update-ytdlp.sh
+!!! and check its output for the error.
+
+EOF
+fi
 
 as_user systemctl --user enable music-coordinator.service ytdlp-update.timer
 as_user systemctl --user restart music-coordinator.service
@@ -107,7 +120,7 @@ Done. The speaker is called "$(python3 "$DEST/musicconf.py" -c "$CONFIG" --json 
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["names"]["youtube"])')".
 
   Settings:  sudo nano $CONFIG        (name, output, volume caps, ...)
-  Logs:      journalctl --user -u 'music-*' -f        (run as $FRAME_USER)
+  Logs:      music-logs -f                            (Ctrl+C to stop)
   Status:    systemctl --user status 'music-*'
 
 Phones must be on the same Wi-Fi as the Pi (YouTube also works with "Link with TV code").

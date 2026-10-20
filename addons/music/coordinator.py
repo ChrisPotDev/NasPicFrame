@@ -108,7 +108,9 @@ def sink_kind(sink):
         return "usb"
     if "hdmi" in text:
         return "hdmi"
-    if "headphones" in text or "bcm2835" in text:
+    # The Pi's built-in analogue output; on Trixie it's named after the firmware
+    # mailbox device (e.g. alsa_output.platform-3f00b840.mailbox.stereo-fallback).
+    if "headphones" in text or "bcm2835" in text or ".mailbox." in text:
         return "headphones"
     return None
 

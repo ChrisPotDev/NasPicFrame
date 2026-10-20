@@ -61,7 +61,7 @@ export class MpvPlayer extends Player {
       return false;
     }
     if (!(await loaded)) {
-      (this.logger ?? console).warn(`[picframe] Could not play ${video.id} (yt-dlp failed or timed out)`);
+      (this.logger ?? console).warn(`[picframe] Could not play ${video.id}: yt-dlp failed or timed out (test it with /opt/picframe-music/update-ytdlp.sh)`);
       return false;
     }
     if (position > 0) {

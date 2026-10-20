@@ -76,7 +76,7 @@ All commands are run as the desktop user, not with sudo:
 
 ```bash
 systemctl --user status 'music-*'            # are the services running?
-journalctl --user -u 'music-*' -f            # live logs
+music-logs -f                                # live logs (Ctrl+C to stop); music-logs -n 200 = recent
 pactl list short sinks                       # audio outputs PipeWire can see
 ~/.local/share/picframe-music/venv/bin/yt-dlp --version
 /opt/picframe-music/update-ytdlp.sh          # update yt-dlp now
@@ -88,7 +88,7 @@ pactl list short sinks                       # audio outputs PipeWire can see
 | YouTube connects but nothing plays | yt-dlp can't fetch the audio. Run `/opt/picframe-music/update-ytdlp.sh`; if it still fails, YouTube has changed and a yt-dlp fix usually follows within days. AirPlay keeps working meanwhile. |
 | Sound comes from the screen, not the amp | Set `output = usb` or `headphones`. Check `pactl list short sinks` lists the DAC. |
 | Hiss or crackle on the headphone jack | Expected on the Pi 3's jack; use a USB DAC. |
-| Two songs at once | Check `journalctl --user -u music-coordinator` and report it: the coordinator should stop one of them. |
+| Two songs at once | Check `music-logs -n 100` and report it: the coordinator should stop one of them. |
 
 ## Not verified on hardware yet
 

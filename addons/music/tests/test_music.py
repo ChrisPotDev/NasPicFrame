@@ -186,6 +186,14 @@ def test_sink_kinds():
     assert [coordinator.sink_kind(s) for s in (USB, JACK, HDMI)] == ["usb", "headphones", "hdmi"]
 
 
+def test_trixie_pi3_jack_is_headphones():
+    # As reported by PipeWire on a Pi 3 running Raspberry Pi OS Trixie.
+    jack = {"index": 57, "name": "alsa_output.platform-3f00b840.mailbox.stereo-fallback",
+            "description": "Built-in Audio Stereo", "properties": {}}
+    assert coordinator.sink_kind(jack) == "headphones"
+    assert coordinator.choose_sink([jack], "auto") == jack["name"]
+
+
 def test_choose_sink():
     assert coordinator.choose_sink([HDMI, JACK, USB], "auto") == USB["name"]
     assert coordinator.choose_sink([HDMI, JACK], "auto") == JACK["name"]  # DAC unplugged
