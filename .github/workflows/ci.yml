@@ -47,6 +47,23 @@ jobs:
       - name: Syntax check
         run: for f in *.js; do node --check "$f"; done
 
+  ytdlp-install:
+    # Runs the real installer script: fresh install, then an update. YouTube blocks
+    # GitHub's servers, so the playback test is skipped; installing is what's checked.
+    name: yt-dlp install script
+    runs-on: ubuntu-latest
+    env:
+      YTDLP_SKIP_TEST: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get install -y --no-install-recommends python3-venv
+      - name: Fresh install
+        run: addons/music/update-ytdlp.sh
+      - name: Second run (update path)
+        run: addons/music/update-ytdlp.sh
+      - name: yt-dlp works
+        run: ~/.local/share/picframe-music/venv/bin/yt-dlp --version
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

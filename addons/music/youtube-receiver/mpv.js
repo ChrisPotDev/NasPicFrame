@@ -26,7 +26,8 @@ export class MpvClient extends EventEmitter {
     fs.rmSync(this.#socketPath, { force: true });
     this.#proc = spawn('mpv', this.#args, { stdio: ['ignore', 'inherit', 'inherit'] });
     this.#proc.on('exit', (code, signal) => this.emit('exit', code, signal));
-    for (let i = 0; i < 100; i++) { // up to 10 s for mpv to create its socket
+    // Up to 45 s for mpv to create its socket: a busy Pi 3 can be slow to start it.
+    for (let i = 0; i < 450; i++) {
       try {
         await this.#connect();
         return;

@@ -24,7 +24,9 @@ export function mpvArgs({ socketPath, ytdlpPath, startVolume }) {
   return [
     '--idle=yes',
     '--no-video',
-    '--no-terminal',
+    // No keyboard input, but keep warnings and errors so they reach the journal.
+    '--no-input-terminal',
+    '--msg-level=all=warn',
     `--input-ipc-server=${socketPath}`,
     // PulseAudio API (served by PipeWire), so the coordinator can see this stream
     // under a fixed name and route it to the DAC or the headphone jack.

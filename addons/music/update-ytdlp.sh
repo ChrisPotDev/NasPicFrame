@@ -6,6 +6,7 @@
 #   update-ytdlp.sh           install / update now (run as the desktop user, not root)
 #   update-ytdlp.sh --timer   nightly run: skipped if auto_update_ytdlp = no
 set -euo pipefail
+trap 'echo "update-ytdlp.sh: failed at line $LINENO (exit $?)" >&2' ERR
 
 VENV="$HOME/.local/share/picframe-music/venv"
 CONFIG="${MUSIC_CONFIG_FILE:-/etc/picframe/music.ini}"
@@ -24,7 +25,8 @@ if [ "${1:-}" = "--timer" ] && [ -r "$CONFIG" ] &&
 fi
 
 pip() { "$VENV/bin/python" -m pip --disable-pip-version-check --quiet "$@"; }
-version() { "$VENV/bin/python" -m pip show yt-dlp 2>/dev/null | awk '/^Version:/ {print $2}'; }
+# Empty when not installed. (`pip show` fails then; that must not end the script.)
+version() { { "$VENV/bin/python" -m pip show yt-dlp 2>/dev/null || true; } | awk '/^Version:/ {print $2}'; }
 smoke_test() {
     timeout 180 "$VENV/bin/yt-dlp" --quiet --no-warnings --js-runtimes node \
         -f bestaudio --get-url "$TEST_URL" >/dev/null
@@ -43,6 +45,11 @@ if ! pip install --upgrade "yt-dlp[default]"; then
     exit 1
 fi
 current="$(version)"
+
+if [ "${YTDLP_SKIP_TEST:-}" = "1" ]; then   # CI: GitHub's servers are blocked by YouTube
+    echo "yt-dlp $current installed (test skipped)"
+    exit 0
+fi
 
 if ! curl -fsS --max-time 10 -o /dev/null https://www.youtube.com; then
     echo "yt-dlp $current installed; YouTube not reachable right now, so not tested" >&2
